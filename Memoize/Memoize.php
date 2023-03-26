@@ -11,9 +11,17 @@ class Memoize
 
     private $args = [];
 
-    private $with = [];
+    private $withFields = [];
 
-    public static function args(array $args): object
+    private $withTaxonomies = [];
+
+    /**
+     * WordPress Query
+     *
+     * @param array $args
+     * @return object
+     */
+    public static function query(array $args): object
     {
         self::$instance = new self;
         self::$instance->args = $args;
@@ -21,18 +29,48 @@ class Memoize
         return self::$instance;
     }
 
-    public function with(array $with): self
+    /**
+     * ACF Fields to eager load
+     *
+     * @param array $fields
+     * @return self
+     */
+    public function withFields(array $fields): self
     {
-        self::$instance->with = $with;
+        self::$instance->withFields = $fields;
         return self::$instance;
     }
 
+    /**
+     * Taxonomies to eager load
+     *
+     * @param array $taxonomies
+     * @return self
+     */
+    public function withTaxonomies(array $taxonomies): self
+    {
+        self::$instance->withTaxonomies = $taxonomies;
+        return self::$instance;
+    }
+
+    /**
+     * Cache query and return WP_Query result
+     *
+     * @return object
+     */
     public function cache(): object
     {
         return self::$instance->saveToFile(self::$instance->args);
     }
 
-    protected function saveToFile($args): Object
+    /**
+     * Save WP_Query result to .json file if the query data
+     * is not already cached. Otherwise, return cached data.
+     *
+     * @param array $args
+     * @return Object
+     */
+    protected function saveToFile(array $args): Object
     {
         $key = crc32(json_encode($args));
         $signature = $args['post_type']? $args['post_type'] . '_' . $key : 'global_' . $key;
@@ -50,9 +88,57 @@ class Memoize
 
         $wpQuery = (new WP_Query($args));
 
-        $acfFieldData = [];
-        if (!empty(self::$instance->with)) {
-            foreach (self::$instance->with as $field) {
+        $json = json_encode([
+            $signature => (object) [
+                'posts' => $wpQuery->posts,
+                'fields' => $this->getFields($wpQuery),
+                'taxonomies' => $this->getTaxonomies($wpQuery)
+            ]
+        ]);
+
+        return $this->createFile($signature, $filePath, $json);
+    }
+
+    /**
+     * Return taxonomies for loaded posts
+     *
+     * @param WP_Query $wpQuery
+     * @return array
+     */
+    protected function getTaxonomies(WP_Query $wpQuery): array
+    {
+        $taxonomies = [];
+
+        if (!empty(self::$instance->withTaxonomies)) {
+            foreach (self::$instance->withTaxonomies as $taxonomy) {
+
+                if ($wpQuery->post_count > 0) {
+                    $with = [];
+
+                    foreach ($wpQuery->posts as $post) {
+                        $with[$post->ID] = wp_get_post_terms($post->ID, $taxonomy);
+                    }
+
+                    $taxonomies[$taxonomy] = $with;
+                }
+            }
+        }
+
+        return $taxonomies;
+    }
+
+    /**
+     * Return ACF fields for loaded posts
+     *
+     * @param WP_Query $wpQuery
+     * @return array
+     */
+    protected function getFields(WP_Query $wpQuery): array
+    {
+        $fields = [];
+
+        if (!empty(self::$instance->withFields)) {
+            foreach (self::$instance->withFields as $field) {
 
                 if ($wpQuery->post_count > 0) {
                     $with = [];
@@ -61,22 +147,24 @@ class Memoize
                         $with[$post->ID] = get_field($field, $post->ID);
                     }
 
-                    $acfFieldData[$field] = $with;
+                    $fields[$field] = $with;
                 }
 
             }
         }
 
-        $json = json_encode([
-            $signature => (object) [
-                'posts' => $wpQuery->posts,
-                'fields' => $acfFieldData,
-            ]
-        ]);
-
-        return $this->createFile($signature, $filePath, $json);
+        return $fields;
     }
 
+    /**
+     * Create file using a unique signature and given data
+     *
+     * @param string $signature
+     * @param string $filePath
+     * @param string $data
+     * @param string $mode
+     * @return Object
+     */
     protected function createFile(string $signature, string $filePath, string $data, string $mode='w'): Object
     {
         $handle = fopen($filePath, $mode);

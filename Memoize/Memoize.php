@@ -64,6 +64,46 @@ class Memoize
     }
 
     /**
+     * Clear cache
+     *
+     * @param string ...$postTypes
+     * @return bool
+     */
+    public static function clear(string ...$postTypes): bool
+    {
+
+        $directory = str_replace("/wp", "", ABSPATH) . "app/uploads/memoize/";
+        $directoryItems = scandir($directory);
+
+        if (empty($postTypes)) {
+
+            foreach ($directoryItems as $item) {
+                if (strpos($item, '.json') !== false) {
+                    unlink($directory . $item);
+                }
+            }
+
+            return true;
+        }
+
+        foreach ($postTypes as $postType) {
+            $files = array_filter($directoryItems, function($item) use ($postType) {
+                if (strpos($item, $postType . '_') !== false) {
+                    return $item;
+                }
+            });
+
+            $file = array_values($files);
+
+            if (!empty($file)) {
+                unlink($directory . $file[0]);
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Save WP_Query result to .json file if the query data
      * is not already cached. Otherwise, return cached data.
      *

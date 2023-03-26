@@ -8,5 +8,11 @@
   },
   "minimum-stability": "dev",
   "prefer-stable": true,
-  "version": "1.0.2"
+  "version": "1.0.2",
+  "keywords": [
+    "WordPress",
+    "Memoize Caching",
+    "Memoize Cache"
+  ],
+  "license": "MIT"
 }

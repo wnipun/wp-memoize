@@ -1,0 +1,12 @@
+{
+  "name": "wnipun/wp-memoize",
+  "description": "Simple disk based caching library for WordPress builds that use roots.io Bedrock.",
+  "autoload": {
+    "psr-4": {
+      "wnipun\\Memoize\\": "src/"
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "version": "1.0.0"
+}

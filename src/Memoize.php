@@ -1,6 +1,6 @@
 <?php
 
-namespace wnipun;
+namespace wnipun\Memoize;
 
 use WP_Query;
 
